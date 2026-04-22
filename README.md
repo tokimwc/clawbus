@@ -44,24 +44,32 @@ This repo ships the Core + FileAdapter + SQLiteAdapter + a working Planner / Wor
 
 ## Architecture
 
-```
-┌──────────┐    ┌──────────┐    ┌─────────────────┐
-│ Planner  │───▶│  Worker  │───▶│ Human Approval  │
-│  agent   │    │  agent   │    │     Gate        │
-└──────────┘    └──────────┘    └─────────────────┘
-       │              │                   │
-       └──────┬───────┴───────┬───────────┘
-              ▼               ▼
-        ┌──────────────────────────┐
-        │    ClawBus Core          │
-        │  - Message Protocol      │
-        │  - Append-only Store     │
-        │  - Adapter Interface     │
-        └──────────────────────────┘
-              │
-              ├─▶ FileAdapter   (default, zero-dep)
-              ├─▶ SQLiteAdapter (default, better-sqlite3)
-              └─▶ DiscordAdapter (optional plugin)
+```mermaid
+flowchart TB
+    subgraph Agents["Agents (Claude Agent SDK)"]
+        P[Planner agent]
+        W[Worker agent]
+        H[Human Approval Gate]
+    end
+
+    P -- task --> W
+    W -- approval-request --> H
+    H -- approval-decision --> W
+    W -- result --> P
+
+    P <--> Core
+    W <--> Core
+    H <--> Core
+
+    subgraph Core["ClawBus Core"]
+        Proto[Message Protocol<br/>task / result / approval-* / log]
+        Store[(Append-only Store)]
+        AIF[Adapter Interface]
+    end
+
+    AIF --> FA[FileAdapter<br/>default · zero-dep]
+    AIF --> SA[SQLiteAdapter<br/>default · node:sqlite]
+    AIF -.optional.-> DA[DiscordAdapter<br/>plugin]
 ```
 
 See [`docs/protocol.md`](docs/protocol.md) for the message schema and [`docs/quickstart.md`](docs/quickstart.md) for how to wire your own agents.
@@ -74,7 +82,7 @@ See [`docs/protocol.md`](docs/protocol.md) for the message schema and [`docs/qui
 npm install clawbus
 ```
 
-Node ≥ 20. Uses `better-sqlite3` (native) — if you prefer a pure-JS setup, use the `FileAdapter` instead.
+Node ≥ 22.5 (uses the built-in `node:sqlite` — no native compile step). If you're on an older Node, use the `FileAdapter` instead.
 
 ---
 
