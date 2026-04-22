@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# local bus data
+.clawbus/
+*.sqlite
+*.sqlite-journal
+
+# editor
+.vscode/
+.idea/

@@ -1,0 +1,70 @@
+{
+  "name": "clawbus",
+  "version": "0.0.1",
+  "description": "A minimal protocol turning multiple Claude Code sessions into an observable, auditable agent team.",
+  "type": "module",
+  "bin": {
+    "clawbus": "./dist/cli/index.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./core": {
+      "types": "./dist/core/index.d.ts",
+      "import": "./dist/core/index.js"
+    },
+    "./adapters/file": {
+      "types": "./dist/adapters/file.d.ts",
+      "import": "./dist/adapters/file.js"
+    },
+    "./adapters/sqlite": {
+      "types": "./dist/adapters/sqlite.d.ts",
+      "import": "./dist/adapters/sqlite.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "docs"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "clean": "rimraf dist"
+  },
+  "keywords": [
+    "claude-code",
+    "claude-agent-sdk",
+    "multi-agent",
+    "orchestration",
+    "agent-bus",
+    "anthropic"
+  ],
+  "author": "tokimwc",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tokimwc/clawbus.git"
+  },
+  "dependencies": {
+    "ulid": "^2.3.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.3",
+    "vitest": "^2.1.5"
+  },
+  "engines": {
+    "node": ">=22.5"
+  }
+}
