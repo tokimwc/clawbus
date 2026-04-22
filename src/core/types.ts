@@ -77,7 +77,7 @@ export const ClawBusMessageSchema = z.object({
   payload: z.unknown(),
   parent: z.string().min(1).optional(),
   createdAt: z.string().min(1),
-  meta: z.record(z.unknown()).optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type MessageFilter = Partial<

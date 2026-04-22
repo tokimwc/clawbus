@@ -1,0 +1,10 @@
+{
+  "name": "broken-node-project",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Toy project with a deliberate bug for the ClawBus demo.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test.mjs"
+  }
+}
