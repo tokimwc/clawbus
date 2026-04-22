@@ -1,4 +1,5 @@
-import { query, type Options, type SDKMessage } from "@anthropic-ai/claude-agent-sdk";
+import { randomUUID } from "node:crypto";
+import { query, type Options, type SDKMessage, type SDKUserMessage } from "@anthropic-ai/claude-agent-sdk";
 
 export interface RunOptions extends Omit<Options, "abortController"> {
   /** Optional callback invoked for every SDK message (for live logging). */
@@ -9,13 +10,27 @@ export interface RunOptions extends Omit<Options, "abortController"> {
  * Run a one-shot Claude Agent SDK query and return the final assistant text
  * (the `result` field of the final `result` message). Throws on any error
  * result so callers can surface failures cleanly.
+ *
+ * Uses streaming-input mode (AsyncIterable<SDKUserMessage>) rather than the
+ * simpler string-prompt mode — the SDK's bidirectional control channel, which
+ * is what routes `canUseTool` callbacks, is only fully wired when the input
+ * is an async iterable.
  */
 export async function runSdkQuery(
   prompt: string,
   options: RunOptions = {},
 ): Promise<{ text: string; costUsd: number; numTurns: number }> {
   const { onMessage, ...sdkOptions } = options;
-  const q = query({ prompt, options: sdkOptions });
+  const sessionId = randomUUID();
+  async function* promptStream(): AsyncGenerator<SDKUserMessage> {
+    yield {
+      type: "user",
+      message: { role: "user", content: prompt },
+      parent_tool_use_id: null,
+      session_id: sessionId,
+    };
+  }
+  const q = query({ prompt: promptStream(), options: sdkOptions });
 
   let finalText = "";
   let costUsd = 0;

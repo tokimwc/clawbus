@@ -108,6 +108,12 @@ export async function runWorker(
   const { text, costUsd } = await runSdkQuery(prompt, {
     systemPrompt: WORKER_SYSTEM,
     tools: ["Read", "Grep", "Glob", "Bash", "Edit"],
+    // Explicit 'default' mode + empty settingSources ensures the SDK
+    // routes tool-permission requests to our canUseTool callback and does
+    // not inherit the user's ~/.claude/settings.json `bypassPermissions`
+    // or any auto-allow list that would silently approve Edit/Write.
+    permissionMode: "default",
+    settingSources: [],
     canUseTool,
     cwd: input.cwd,
     ...(input.model ? { model: input.model } : {}),
