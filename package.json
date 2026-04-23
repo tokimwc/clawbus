@@ -24,6 +24,10 @@
     "./adapters/sqlite": {
       "types": "./dist/adapters/sqlite.d.ts",
       "import": "./dist/adapters/sqlite.js"
+    },
+    "./adapters/discord": {
+      "types": "./dist/adapters/discord.d.ts",
+      "import": "./dist/adapters/discord.js"
     }
   },
   "files": [
@@ -56,6 +60,7 @@
   },
   "dependencies": {
     "@anthropic-ai/claude-agent-sdk": "^0.2.117",
+    "discord.js": "^14.26.3",
     "ulid": "^2.3.0",
     "zod": "^4.3.6"
   },
