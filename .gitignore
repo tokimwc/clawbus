@@ -21,3 +21,6 @@ coverage/
 
 # Discord adapter cache
 .clawbus-discord-cache/
+
+# Screenshots — raw versions may contain sensitive Discord IDs
+docs/screenshots/*-raw.png

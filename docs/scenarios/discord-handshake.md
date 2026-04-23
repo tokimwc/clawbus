@@ -26,12 +26,12 @@ running against a live Discord bot. It demonstrates:
 [14:29:42] [planner received] result from worker
 
 → sending approval-request from worker
-   (react with ✅ or ❌ in Discord; reviewers: 836376415955058738)
+   (react with ✅ or ❌ in Discord; reviewers: <reviewer-discord-id>)
 [14:29:45] [human seat received] approval-request from worker
 
 → waiting up to 60s for human reaction...
 [14:29:48] [worker received] approval-decision from human
-✓ approval-decision received: approve (reviewer 836376415955058738)
+✓ approval-decision received: approve (reviewer <reviewer-discord-id>)
 
 → querying cached messages
 ✓ cache has 6 messages:
@@ -59,6 +59,92 @@ that's the cache surviving across processes, not a bug.)
 - **The append-only log spans the transport.** All six messages are
   queryable from the local SQLite cache — including the synthesized
   `approval-decision` that originated as a Discord reaction.
+
+## Live channel screenshot
+
+![Discord channel showing the four-message handshake](../screenshots/discord-flow.png)
+
+The reviewer's Discord user ID is redacted; everything else is the real
+output of the demo command running against a private bot in a private
+channel of the author's personal Discord server. The bot is named
+`ClawBus Hackathon` and was created from scratch during the hackathon
+window.
+
+## Full message bodies (verbatim)
+
+Captured by hand from the Discord channel after the demo run:
+
+### Message 1 — `task` (planner → worker)
+
+```json
+{
+  "id": "01KPWD1GWSAGMRERMKWMBE3CQ5",
+  "from": "planner",
+  "to": "worker",
+  "kind": "task",
+  "payload": {
+    "goal": "say hello in three languages"
+  },
+  "createdAt": "2026-04-23T05:29:42.553Z"
+}
+```
+
+### Message 2 — `result` (worker → planner)
+
+```json
+{
+  "id": "01KPWD1GX80ZMT8TSEP888YYVC",
+  "from": "worker",
+  "to": "planner",
+  "kind": "result",
+  "payload": {
+    "status": "ok",
+    "summary": "acknowledged: {\"goal\":\"say hello in three languages\"}"
+  },
+  "parent": "01KPWD1GWSAGMRERMKWMBE3CQ5",
+  "createdAt": "2026-04-23T05:29:42.568Z"
+}
+```
+
+### Message 3 — `approval-request` (worker → human)
+
+```json
+{
+  "id": "01KPWD1KG8B7S71MX60XEF9WF1",
+  "from": "worker",
+  "to": "human",
+  "kind": "approval-request",
+  "payload": {
+    "action": "Edit src/example.ts",
+    "diff": "@@ -1,1 +1,1 @@\n-greet('hello')\n+greet('hello, world')",
+    "severity": "medium",
+    "rationale": "demo only — verify approval flow over Discord"
+  },
+  "createdAt": "2026-04-23T05:29:45.224Z"
+}
+```
+
+### Message 4 — `approval-decision` (human → worker, synthesized from ✅ reaction)
+
+```json
+{
+  "id": "dec_01KPWD1KG8B7S71MX60XEF9WF1_1776922188786",
+  "from": "human",
+  "to": "worker",
+  "kind": "approval-decision",
+  "payload": {
+    "decision": "approve",
+    "reviewer": "<reviewer-discord-id>",
+    "note": "via Discord reaction ✅"
+  },
+  "parent": "01KPWD1KG8B7S71MX60XEF9WF1",
+  "createdAt": "2026-04-23T05:29:48.786Z"
+}
+```
+
+Notice that message 4 has `"parent": "01KPWD1KG8B7S71MX60XEF9WF1"` — the
+ID of the approval-request — establishing the causal link between human
+approval and the worker's pending mutation.
 
 ## How to reproduce
 

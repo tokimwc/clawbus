@@ -162,7 +162,11 @@ await bus.connect();
 // ... rest of the code is identical ...
 ```
 
-When the bus sends an `approval-request`, the adapter posts it to the channel and attaches ✅ / ❌ reactions. A reaction from an authorized reviewer's Discord account becomes an `approval-decision` message on the bus — the same shape your worker would have received locally. See [`docs/scenarios/discord-handshake.md`](docs/scenarios/discord-handshake.md) for the recorded round-trip.
+When the bus sends an `approval-request`, the adapter posts it to the channel and attaches ✅ / ❌ reactions. A reaction from an authorized reviewer's Discord account becomes an `approval-decision` message on the bus — the same shape your worker would have received locally.
+
+![DiscordAdapter live channel showing task → result → approval-request → ✅ → approval-decision](docs/screenshots/discord-flow.png)
+
+See [`docs/scenarios/discord-handshake.md`](docs/scenarios/discord-handshake.md) for the recorded round-trip with full message bodies.
 
 ---
 
