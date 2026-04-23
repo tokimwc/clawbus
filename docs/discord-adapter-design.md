@@ -1,6 +1,6 @@
 # DiscordAdapter — Design Note
 
-> Status: **Draft** (2026-04-23 hackathon late-stage addition)
+> Status: **Shipped** (2026-04-23, real-bot E2E verified — see [`scenarios/discord-handshake.md`](scenarios/discord-handshake.md))
 > Goal: Validate `Adapter` interface across a real distributed transport, prove "adapter pluralism" beyond local files.
 
 ## Why now

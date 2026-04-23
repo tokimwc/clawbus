@@ -40,9 +40,9 @@ Individual Claude Code agents are stateful and great at deep work, but coordinat
 
 1. **A message protocol** (`task`, `result`, `approval-request`, `approval-decision`, `log`) — small enough to memorize, expressive enough for planner / worker / reviewer patterns.
 2. **An append-only message store** — every agent utterance is persisted with a causal parent link, so any run is auditable after the fact.
-3. **Swappable adapters** — the same protocol rides on local files or SQLite today, with the adapter interface ready for distributed transports (Discord / Slack / NATS) when you need them. Core code doesn't know or care.
+3. **Swappable adapters** — the same protocol rides on local files, SQLite, or Discord today; the adapter interface is the seam for additional transports (Slack / NATS / Redis) when you need them. Core code doesn't know or care.
 
-This repo ships the Core + FileAdapter + SQLiteAdapter + a working Planner / Worker / Human-Approval loop using the [Claude Agent SDK](https://docs.claude.com/en/agent-sdk/overview). Two adapters are battle-tested and exercised by the test suite; distributed transports are listed in the Roadmap. The hackathon demo is entirely local so reviewers can reproduce it in a single shell.
+This repo ships the Core + FileAdapter + SQLiteAdapter + DiscordAdapter + a working Planner / Worker / Human-Approval loop using the [Claude Agent SDK](https://docs.claude.com/en/agent-sdk/overview). All three adapters are exercised by the test suite, and the DiscordAdapter has a real-bot end-to-end recipe in [`docs/scenarios/discord-handshake.md`](docs/scenarios/discord-handshake.md). The hackathon demo is entirely local so reviewers can reproduce it in a single shell.
 
 ---
 
@@ -96,7 +96,7 @@ flowchart TB
 
     AIF --> FA[FileAdapter<br/>default · zero-dep]
     AIF --> SA[SQLiteAdapter<br/>default · node:sqlite]
-    AIF -.planned.-> DA[DiscordAdapter<br/>roadmap]
+    AIF --> DA[DiscordAdapter<br/>distributed · discord.js]
 ```
 
 See [`docs/protocol.md`](docs/protocol.md) for the message schema and [`docs/quickstart.md`](docs/quickstart.md) for how to wire your own agents.
@@ -143,6 +143,27 @@ const result = await bus.waitFor({ parent: id, kind: "result" });
 console.log(result.payload);
 ```
 
+### With DiscordAdapter (distributed)
+
+The same code, just swap the adapter to coordinate across machines via a shared Discord channel:
+
+```typescript
+import { ClawBus, DiscordAdapter } from "clawbus";
+
+const bus = new ClawBus({
+  adapter: new DiscordAdapter({
+    token: process.env.DISCORD_BOT_TOKEN!,
+    channelId: process.env.DISCORD_CHANNEL_ID!,
+    reviewerIds: ["<your-discord-user-id>"], // who can ✅/❌ approval-requests
+  }),
+});
+
+await bus.connect();
+// ... rest of the code is identical ...
+```
+
+When the bus sends an `approval-request`, the adapter posts it to the channel and attaches ✅ / ❌ reactions. A reaction from an authorized reviewer's Discord account becomes an `approval-decision` message on the bus — the same shape your worker would have received locally. See [`docs/scenarios/discord-handshake.md`](docs/scenarios/discord-handshake.md) for the recorded round-trip.
+
 ---
 
 ## What's novel
@@ -152,7 +173,7 @@ Compared to building a bespoke coordination layer per project, ClawBus gives you
 - **A protocol, not a framework.** Five message kinds. The rest is up to your agents.
 - **Observability by default.** Every agent message is append-only and queryable.
 - **Human-in-the-loop as a first-class kind** (`approval-request` / `approval-decision`), not bolted on.
-- **Adapter pluralism.** Two working adapters today (`FileAdapter` for zero-dep, `SQLiteAdapter` for queryability). The adapter interface is the seam for distributed transports — bring your own when you need them.
+- **Adapter pluralism.** Three working adapters today (`FileAdapter` for zero-dep, `SQLiteAdapter` for queryability, `DiscordAdapter` for distributed teams with built-in human-in-the-loop via reactions). The adapter interface is the seam for additional transports — bring your own when you need them.
 
 ---
 
@@ -170,7 +191,7 @@ This repository was created from scratch during the hackathon window (initial co
 
 ## Roadmap (post-hackathon)
 
-- **Distributed adapters**: DiscordAdapter, SlackAdapter, NATSAdapter (the adapter interface is already in place)
+- **More distributed adapters**: SlackAdapter, NATSAdapter, RedisAdapter (DiscordAdapter is already shipped — see [`docs/scenarios/discord-handshake.md`](docs/scenarios/discord-handshake.md))
 - Persistent scheduler (cron-style agent triggers)
 - Web dashboard for the message timeline
 - Integration recipe with n8n / GitHub Actions / local dev loops
