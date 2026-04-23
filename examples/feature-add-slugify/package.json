@@ -1,0 +1,10 @@
+{
+  "name": "feature-add-slugify",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Empty starter — ClawBus is asked to implement slugify + tests.",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/*.mjs"
+  }
+}

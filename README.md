@@ -28,9 +28,11 @@ You should see:
 3. A **Human Approval Gate** pause at the terminal asking you to approve/reject.
 4. On approval, the patch is applied and `npx clawbus logs` shows the full causal timeline of messages.
 
-Everything runs locally on SQLite. No network calls except to the Anthropic API. See [`docs/judging-guide.md`](docs/judging-guide.md) for a 5-minute review checklist.
+Everything runs locally on SQLite. No network calls except to the Anthropic API. See [`docs/judging-guide.md`](docs/judging-guide.md) for a 5-minute review checklist with branches for "no API key" vs "with API key" reviewers.
 
-**No API key handy?** Read [`docs/protocol.md`](docs/protocol.md) for the message schema and [`docs/judging-guide.md`](docs/judging-guide.md) for a static walk-through. The whole protocol fits in two pages.
+**No API key handy?** The [judging guide](docs/judging-guide.md) and [`docs/scenarios/`](docs/scenarios/) contain three captured end-to-end runs with full message timelines and costs. The whole protocol fits in two pages — see [`docs/protocol.md`](docs/protocol.md).
+
+**Want the longer argument?** [`docs/manifesto.md`](docs/manifesto.md) explains why we built this and — more importantly — what we deliberately didn't build.
 
 ---
 
@@ -183,16 +185,17 @@ Compared to building a bespoke coordination layer per project, ClawBus gives you
 
 ## Real run logs
 
-Two captured end-to-end runs in [`docs/scenarios/`](docs/scenarios/):
+Three captured end-to-end runs in [`docs/scenarios/`](docs/scenarios/), so reviewers can audit the system without burning their own API credits:
 
 | Scenario | Adapter | What it shows | API spend |
 |---|---|---|---:|
-| [`run-01-fizzbuzz.md`](docs/scenarios/run-01-fizzbuzz.md) | SQLiteAdapter | Planner decomposes 1 goal → 3 subtasks; worker runs tests, locates the bug, requests approval, applies the fix on approval, re-runs tests | $0.0794 |
-| [`discord-handshake.md`](docs/scenarios/discord-handshake.md) | DiscordAdapter | Same protocol over a real Discord channel; human reaction (✅) becomes an `approval-decision` message | $0 (Discord-only) |
+| [`run-01-fizzbuzz.md`](docs/scenarios/run-01-fizzbuzz.md) | SQLiteAdapter | **Bug fix** — Planner decomposes 1 goal → 3 subtasks; worker runs tests, finds the bug, requests approval, applies the fix, re-runs tests | **$0.0794** |
+| [`run-02-feature-add.md`](docs/scenarios/run-02-feature-add.md) | SQLiteAdapter | **New feature** — Worker reads a comment-only spec, writes the source and the tests (2 approval-requests), all 4 tests pass | **$0.0945** |
+| [`discord-handshake.md`](docs/scenarios/discord-handshake.md) | DiscordAdapter | **Same protocol, distributed** — `approval-request` posted to a real Discord channel; human ✅ reaction becomes an `approval-decision` message | $0 (Discord) |
 
-Both directories contain the verbatim CLI stdout, the full append-only
-message timeline (`clawbus logs`), and — for the FizzBuzz scenario — the
-exact diff the worker applied.
+Each doc contains the verbatim CLI stdout, the full append-only message
+timeline (every `clawbus logs` line), and — for the mutating runs — the
+exact diffs the worker applied.
 
 ---
 

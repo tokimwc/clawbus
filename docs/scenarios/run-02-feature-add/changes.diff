@@ -1,0 +1,110 @@
+diff --git a/examples/feature-add-slugify/README.md b/examples/feature-add-slugify/README.md
+new file mode 100644
+index 0000000..2c0bf72
+--- /dev/null
++++ b/examples/feature-add-slugify/README.md
+@@ -0,0 +1,33 @@
++# feature-add-slugify
++
++Empty starter for a ClawBus scenario that **adds a new feature** (rather
++than fixing a bug like `broken-node-project` does).
++
++## Initial state
++
++- `src/utils.mjs` — contains only a spec comment for `slugify`
++- `test/` — empty (no tests yet)
++- `npm test` — passes trivially because there are no tests yet
++
++## What ClawBus is asked to do
++
++```
++Implement the `slugify(input)` function specified in src/utils.mjs.
++Add tests for it under test/utils.test.mjs covering the four examples
++in the spec. Run `npm test` and report whether all tests pass.
++```
++
++## What's interesting about this scenario
++
++Compared to `broken-node-project` (single 1-line bug fix):
++
++- The Planner has to decompose into **at least 2 mutating subtasks**
++  (implement function, write tests).
++- Each mutating subtask raises an `approval-request`. The bus gets
++  more activity and the audit log shows the full timeline of what got
++  approved when.
++- The Worker has to **read a comment-only spec** and produce both
++  source code and tests — closer to real-world coding tasks than
++  bugfixing.
++
++See `docs/scenarios/run-02-feature-add.md` for the captured run.
+diff --git a/examples/feature-add-slugify/package.json b/examples/feature-add-slugify/package.json
+new file mode 100644
+index 0000000..65a5ed9
+--- /dev/null
++++ b/examples/feature-add-slugify/package.json
+@@ -0,0 +1,10 @@
++{
++  "name": "feature-add-slugify",
++  "version": "0.0.1",
++  "private": true,
++  "description": "Empty starter — ClawBus is asked to implement slugify + tests.",
++  "type": "module",
++  "scripts": {
++    "test": "node --test test/*.mjs"
++  }
++}
+diff --git a/examples/feature-add-slugify/src/utils.mjs b/examples/feature-add-slugify/src/utils.mjs
+new file mode 100644
+index 0000000..c5f2ebd
+--- /dev/null
++++ b/examples/feature-add-slugify/src/utils.mjs
+@@ -0,0 +1,24 @@
++// This file starts empty. ClawBus is asked to add a `slugify` function.
++//
++// Spec (ClawBus reads from this comment):
++//   slugify(input: string): string
++//   - lowercase the input
++//   - replace any run of non-alphanumeric characters with a single "-"
++//   - trim leading/trailing "-"
++//   Examples:
++//     slugify("Hello World")           -> "hello-world"
++//     slugify("  Foo--Bar !!  ")       -> "foo-bar"
++//     slugify("Привет")                 -> "" (no ASCII alphanumeric)
++//     slugify("v4.7-beta+build")       -> "v4-7-beta-build"
++
++/**
++ * Converts a string into a URL-friendly slug.
++ * @param {string} input
++ * @returns {string}
++ */
++export function slugify(input) {
++  return input
++    .toLowerCase()
++    .replace(/[^a-z0-9]+/g, '-')
++    .replace(/^-+|-+$/g, '');
++}
+diff --git a/examples/feature-add-slugify/test/utils.test.mjs b/examples/feature-add-slugify/test/utils.test.mjs
+new file mode 100644
+index 0000000..c3004b5
+--- /dev/null
++++ b/examples/feature-add-slugify/test/utils.test.mjs
+@@ -0,0 +1,19 @@
++import { test } from 'node:test';
++import assert from 'node:assert/strict';
++import { slugify } from '../src/utils.mjs';
++
++test('slugify: lowercases and joins words with a hyphen', () => {
++  assert.equal(slugify('Hello World'), 'hello-world');
++});
++
++test('slugify: collapses runs of non-alphanumeric chars and trims hyphens', () => {
++  assert.equal(slugify('  Foo--Bar !!  '), 'foo-bar');
++});
++
++test('slugify: returns empty string when input has no ASCII alphanumeric chars', () => {
++  assert.equal(slugify('Привет'), '');
++});
++
++test('slugify: replaces dots, plus signs, and hyphens with a single hyphen', () => {
++  assert.equal(slugify('v4.7-beta+build'), 'v4-7-beta-build');
++});

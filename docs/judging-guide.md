@@ -1,84 +1,124 @@
 # Judging guide — 5-minute review
 
-This is a reviewer's cheat sheet for **Built with Opus 4.7: a Claude Code
-Hackathon**. Everything here can be verified with `git clone` and a single
-`ANTHROPIC_API_KEY`.
+**Built with Opus 4.7: a Claude Code Hackathon** · Cerebral Valley × Anthropic
 
-## Run the demo (≈ 90 seconds)
+This is a reviewer's cheat sheet. The whole repo is designed to be
+auditable in under 5 minutes. Pick your path:
+
+- **No API key, 60 seconds** → read the [captured run logs](#no-api-key-path)
+- **With `ANTHROPIC_API_KEY`, 3 minutes** → run [the demo yourself](#with-api-key-path)
+- **Reviewer with deeper interest, 5+ minutes** → [design bets](#design-bets) and [code pointers](#code-pointers)
+
+---
+
+## TL;DR (30 seconds)
+
+ClawBus turns multiple Claude Code sessions into one observable,
+auditable agent team. It's **a protocol, not a framework**:
+
+- **5 message kinds** (`task` / `result` / `approval-request` / `approval-decision` / `log`)
+- **Append-only store** with a causal `parent` link on every message
+- **3 working adapters today**: `FileAdapter`, `SQLiteAdapter`, `DiscordAdapter`
+- **Human-in-the-loop as a first-class kind**, not a hook bolted on top
+
+---
+
+## <a id="no-api-key-path"></a>Path A — No API key (60 seconds)
+
+Two captured end-to-end runs, verbatim artifacts already in the repo:
+
+| Scenario | What it shows | Spend |
+|---|---|---:|
+| [`docs/scenarios/run-01-fizzbuzz.md`](scenarios/run-01-fizzbuzz.md) | Bug fix: Planner decomposes, Worker finds + fixes, approval gate fires once | **$0.0794** |
+| [`docs/scenarios/run-02-feature-add.md`](scenarios/run-02-feature-add.md) | New feature: 2 files created, approval gate fires twice, spec comes from a comment block | **$0.0945** |
+| [`docs/scenarios/discord-handshake.md`](scenarios/discord-handshake.md) | Same protocol, same worker, but running **over a real Discord channel** — a ✅ reaction becomes an `approval-decision` message | **$0 (Discord)** |
+
+Each doc contains the full `clawbus logs` timeline (every message
+body), the CLI stdout, and — for the mutating runs — the exact diff
+the worker applied. You can audit the whole system from these three
+documents alone.
+
+---
+
+## <a id="with-api-key-path"></a>Path B — With API key (3 minutes)
 
 ```bash
 git clone https://github.com/tokimwc/clawbus.git
-cd clawbus
-npm install
-npm run build
+cd clawbus && npm install && npm run build
 export ANTHROPIC_API_KEY=sk-ant-...
-npx clawbus demo
+npx clawbus demo --auto      # runs the FizzBuzz scenario end-to-end
+npx clawbus logs             # prints the whole message timeline
 ```
 
-What you should see:
+Expected output (structure, not exact bytes — the model is
+non-deterministic):
 
-1. **Planner** prints a decomposition of the goal ("fix the failing test").
-2. **Worker** runs `npm test` in `examples/broken-node-project/`, reads the
-   source, and proposes an `Edit` on `src/fizzbuzz.mjs`.
-3. The proposed edit is **paused at a human approval prompt** — you type
-   `y` or `n` at the terminal.
-4. On approval, the edit is applied and the tests are re-run. `status: ok`.
-5. On reject, the worker reports the denial in its result summary and no
-   file is modified.
+1. Planner decomposes the goal into 3 subtasks (~$0.01)
+2. Worker runs `npm test`, identifies the failing test (~$0.03)
+3. Worker reads source, proposes an `Edit` — emits `approval-request` — gate approves — patch lands (~$0.02)
+4. Worker re-runs tests, reports pass (~$0.01)
+5. `clawbus logs` prints 9 messages with full causal chain
 
-Use `--auto` to skip the prompts for recording:
+Drop `--auto` to see the approval gate actually ask before touching
+your disk. Total run: ~$0.08 and ~90 seconds.
 
-```bash
-npx clawbus demo --auto
-```
+### Try the Discord adapter (5 minutes, optional)
 
-## Audit the timeline
+See [`docs/scenarios/discord-handshake.md`](scenarios/discord-handshake.md)
+for the reproduction recipe. You'll need a bot token and a channel.
 
-```bash
-npx clawbus logs
-npx clawbus logs --kind approval-request
-npx clawbus logs --kind approval-decision
-```
+---
 
-Every message is append-only in `.clawbus/bus.sqlite` with a `parent`
-field linking responses to their triggers. You can reconstruct the full
-causal graph of any run after the fact.
+## <a id="design-bets"></a>Design bets
 
-## What to look at
+- **Protocol, not framework.** Five message kinds, a `parent` link, an
+  append-only store. That's the whole surface. Your agents can be
+  one-shot `query()` calls, stateful sessions, or anything in
+  between — the bus doesn't care.
+- **Observability by default.** Every agent utterance is persisted
+  before it's delivered. Crash recovery, post-hoc audits, and
+  "what did the agent say to get that answer?" are all just
+  `clawbus logs` queries.
+- **Human-in-the-loop is a first-class kind.** `approval-request` and
+  `approval-decision` are in the protocol, not bolted on as a hook.
+  The DiscordAdapter uses Discord reactions as the reviewer UI
+  without changing the protocol at all.
+- **Adapter pluralism.** The same code runs on local files, SQLite,
+  or a shared Discord channel. That's the adapter contract doing its
+  job — and it's the seam where Slack / NATS / Redis transports will
+  plug in next.
 
-| Dimension | Where to look |
+---
+
+## <a id="code-pointers"></a>Code pointers
+
+| Thing | File |
 |---|---|
-| **Protocol** | [`docs/protocol.md`](./protocol.md) — 5 kinds, small, versioned |
-| **Core** | [`src/core/bus.ts`](../src/core/bus.ts) — `send` / `subscribe` / `waitFor` / `query` |
-| **Adapters** | [`src/adapters/file.ts`](../src/adapters/file.ts) and [`src/adapters/sqlite.ts`](../src/adapters/sqlite.ts) — same contract, two backends |
-| **Agents (SDK integration)** | [`src/agents/planner.ts`](../src/agents/planner.ts), [`src/agents/worker.ts`](../src/agents/worker.ts), [`src/agents/approval.ts`](../src/agents/approval.ts) |
-| **Human-in-the-loop** | [`src/agents/worker.ts`](../src/agents/worker.ts) — `canUseTool` routes `Edit` / `Write` through the bus |
-| **Tests** | `test/core.test.ts` (8), `test/adapters.test.ts` (12). Run with `npm test`. |
+| Protocol schema | [`src/core/types.ts`](../src/core/types.ts) |
+| Bus core | [`src/core/bus.ts`](../src/core/bus.ts) — `send` / `subscribe` / `waitFor` / `query` |
+| FileAdapter | [`src/adapters/file.ts`](../src/adapters/file.ts) |
+| SQLiteAdapter | [`src/adapters/sqlite.ts`](../src/adapters/sqlite.ts) |
+| DiscordAdapter | [`src/adapters/discord.ts`](../src/adapters/discord.ts) |
+| Planner | [`src/agents/planner.ts`](../src/agents/planner.ts) |
+| Worker | [`src/agents/worker.ts`](../src/agents/worker.ts) — `canUseTool` routes `Edit` / `Write` through the gate |
+| Approval gate | [`src/agents/approval.ts`](../src/agents/approval.ts) |
+| CLI | [`src/cli/index.ts`](../src/cli/index.ts) |
+| Tests (27, all pass) | [`test/core.test.ts`](../test/core.test.ts) · [`test/adapters.test.ts`](../test/adapters.test.ts) · [`test/discord-adapter.test.ts`](../test/discord-adapter.test.ts) |
+| CI | [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — green on every commit to main |
 
-## Design bets
-
-- **Protocol, not framework.** Only five message kinds. The rest is up to
-  the caller, so a Planner can be a one-shot `query()` or a stateful
-  session — the bus doesn't care.
-- **Append-only, causal.** Every message has a `parent` link. Given any
-  message id you can reconstruct the chain that led to it.
-- **Adapters are swappable without touching agents.** The demo runs on
-  SQLite; the same code runs on the File adapter, and a Discord adapter
-  is on the roadmap for distributed teams.
-- **Approval is first-class.** `approval-request` and `approval-decision`
-  are message kinds, not bolted-on hooks. Any agent can demand approval
-  from any other, and the exchange is visible in `clawbus logs`.
+---
 
 ## Hackathon compliance
 
-- Initial commit `896c4e0` is timestamped **2026-04-22 JST** — after the
-  hackathon kickoff (2026-04-21 12:00 PM EDT = 2026-04-22 01:00 JST).
-- No code was copied from any previous project. The design is informed
-  by a production multi-agent system run across my 5-node home cluster,
-  but every file under `src/`, `docs/`, `examples/`, and `test/` was
-  authored fresh during the hackathon window.
-- MIT licensed, all copyrights are mine.
+- Initial commit timestamped **2026-04-22 JST** (after the 2026-04-21 12 PM EDT kickoff).
+- **No code reuse** from prior projects. Design is informed by a
+  production multi-agent system running on my 5-node home cluster;
+  every file under `src/`, `test/`, `docs/`, and `examples/` is new work
+  authored during the hackathon window.
+- MIT licensed. `git log --reverse` shows the full provenance.
 
-If you want to verify the provenance claim, `git log --reverse` shows
-the whole history, and `git show <hash>` on any commit shows exactly what
-landed when.
+## Three things to take away
+
+1. **Multi-agent coordination doesn't need a new runtime.** It needs a protocol, a log, and honest interfaces. That's ClawBus.
+2. **Human approval belongs inside the protocol, not outside it.** `approval-request` carrying the full payload — path, diff, rationale — is the right shape. Reviews (human or another agent) become queryable messages.
+3. **If a distributed transport can be a single file (`src/adapters/discord.ts`), your framework was too big.** ClawBus's `Adapter` interface is four methods. That's the lever.

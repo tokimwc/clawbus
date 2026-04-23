@@ -1,0 +1,76 @@
+[planner] goal: Implement the `slugify(input)` function specified in src/utils.mjs. Add tests for it under test/utils.test.mjs covering the four examples in the spec. Run `npm test` and report whether all tests pass.
+[planner] produced 3 subtask(s) (cost $0.0104):
+  - [s1] Read src/utils.mjs to view the slugify specification, then implement the slugify(input) function according to the spec.
+  - [s2] Create test/utils.test.mjs with tests covering the four examples from the slugify spec in src/utils.mjs.
+  - [s3] Run `npm test` and report whether all tests pass, including any failure details.
+
+[worker] executing: Read src/utils.mjs to view the slugify specification, then implement the slugify(input) function according to the spec.
+[worker] done (approvals=1 rejections=0 cost=$0.0265)
+[worker] summary:
+  ---
+  
+  **Summary**
+  
+  I read `src/utils.mjs` and found the slugify specification embedded in a comment block. The function must:
+  1. Lowercase the input.
+  2. Replace every run of non-alphanumeric characters with a single `"-"`.
+  3. Strip leading and trailing `"-"` characters.
+  
+  I appended the following implementation to the file:
+  
+  ```js
+  export function slugify(input) {
+    return input
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+  ```
+  
+  - `/[^a-z0-9]+/g` matches one-or-more consecutive non-alphanumeric characters and collapses them into a single `"-"`.
+  - `/^-+|-+$/g` strips any leading or trailing hyphens that result from the previous step.
+  
+  All four examples from the spec are satisfied by this implementation.
+
+[worker] executing: Create test/utils.test.mjs with tests covering the four examples from the slugify spec in src/utils.mjs.
+[worker] done (approvals=1 rejections=0 cost=$0.0448)
+[worker] summary:
+  All 4 tests pass. Here's a summary of what was done:
+  
+  ---
+  
+  **Summary**
+  
+  - **Observed:** `src/utils.mjs` already contains a working `slugify` implementation with four documented examples in its spec comment. The `test/` directory was empty. The project uses ESM (`"type": "module"`) and `node --test` as its runner (Node v24).
+  
+  - **Changed:** Created `test/utils.test.mjs` with four `test()` cases — one per spec example — using `node:test` and `node:assert/strict`. Each test directly asserts the expected output documented in the spec:
+    1. `"Hello World"` → `"hello-world"`
+    2. `"  Foo--Bar !!  "` → `"foo-bar"`
+    3. `"Привет"` → `""`
+    4. `"v4.7-beta+build"` → `"v4-7-beta-build"`
+  
+  - **Result:** `npm test` reports 4 pass / 0 fail.
+
+[worker] executing: Run `npm test` and report whether all tests pass, including any failure details.
+[worker] done (approvals=0 rejections=0 cost=$0.0128)
+[worker] summary:
+  ## Summary
+  
+  All **4 tests passed** with no failures.
+  
+  | Metric | Result |
+  |--------|--------|
+  | Total tests | 4 |
+  | Passed | 4 ✅ |
+  | Failed | 0 |
+  | Skipped/Cancelled | 0 |
+  
+  The test suite covers the `slugify` function with these passing cases:
+  1. **Lowercases and joins words with a hyphen** (0.72 ms)
+  2. **Collapses runs of non-alphanumeric chars and trims hyphens** (0.13 ms)
+  3. **Returns empty string when input has no ASCII alphanumeric chars** (0.13 ms)
+  4. **Replaces dots, plus signs, and hyphens with a single hyphen** (0.10 ms)
+  
+  Total run time: ~82 ms. The project is in a clean, fully-passing state.
+
+[ok] pipeline complete. run 'clawbus logs' to inspect the full message timeline.
