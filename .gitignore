@@ -15,3 +15,6 @@ coverage/
 # editor
 .vscode/
 .idea/
+
+# Claude Code workspace
+.claude/
