@@ -4,4 +4,10 @@ export {
   SQLiteAdapter,
   type SQLiteAdapterOptions,
 } from "./adapters/sqlite.js";
+export {
+  DiscordAdapter,
+  type DiscordAdapterOptions,
+  encodeMessage as encodeDiscordMessage,
+  decodeMessage as decodeDiscordMessage,
+} from "./adapters/discord.js";
 export * from "./agents/index.js";
