@@ -181,6 +181,21 @@ Compared to building a bespoke coordination layer per project, ClawBus gives you
 
 ---
 
+## Real run logs
+
+Two captured end-to-end runs in [`docs/scenarios/`](docs/scenarios/):
+
+| Scenario | Adapter | What it shows | API spend |
+|---|---|---|---:|
+| [`run-01-fizzbuzz.md`](docs/scenarios/run-01-fizzbuzz.md) | SQLiteAdapter | Planner decomposes 1 goal → 3 subtasks; worker runs tests, locates the bug, requests approval, applies the fix on approval, re-runs tests | $0.0794 |
+| [`discord-handshake.md`](docs/scenarios/discord-handshake.md) | DiscordAdapter | Same protocol over a real Discord channel; human reaction (✅) becomes an `approval-decision` message | $0 (Discord-only) |
+
+Both directories contain the verbatim CLI stdout, the full append-only
+message timeline (`clawbus logs`), and — for the FizzBuzz scenario — the
+exact diff the worker applied.
+
+---
+
 ## Hackathon compliance notice
 
 This repository was created from scratch during the hackathon window (initial commit `2026-04-22` JST, after the `2026-04-21 12:00 PM EDT` kickoff). The **design** is informed by a production multi-agent system I've been running across a 5-node home cluster ("Claw family"), but **no code from that system is reused here** — everything in `src/`, `docs/`, and `examples/` is new work authored for this submission. See `docs/judging-guide.md` for how to audit that claim.

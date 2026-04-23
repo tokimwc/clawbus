@@ -1,0 +1,14 @@
+diff --git a/examples/broken-node-project/src/fizzbuzz.mjs b/examples/broken-node-project/src/fizzbuzz.mjs
+index 49948ca..c9aacfa 100644
+--- a/examples/broken-node-project/src/fizzbuzz.mjs
++++ b/examples/broken-node-project/src/fizzbuzz.mjs
+@@ -11,8 +11,8 @@
+ export function fizzbuzz(n) {
+   // BUG: the order of these branches is wrong. `n % 3 === 0` fires before
+   // `n % 15 === 0`, so 15, 30, 45, ... return "Fizz" instead of "FizzBuzz".
++  if (n % 15 === 0) return "FizzBuzz";
+   if (n % 3 === 0) return "Fizz";
+   if (n % 5 === 0) return "Buzz";
+-  if (n % 15 === 0) return "FizzBuzz";
+   return String(n);
+ }
