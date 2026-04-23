@@ -2,6 +2,8 @@
 
 > **A minimal protocol turning multiple Claude Code sessions into an observable, auditable agent team.**
 
+**Claude Code is excellent per session. ClawBus makes cross-session coordination auditable without inventing a new runtime.**
+
 Claude Code is powerful as a single coding agent, but real work usually needs a team — planning, investigation, implementation, review, and human approval. ClawBus defines a minimal protocol and reference implementation so multiple Claude Code / Claude Agent SDK sessions can delegate subtasks, share context, and surface decisions that need human sign-off.
 
 This repository is the submission for **Built with Opus 4.7: a Claude Code Hackathon** (Cerebral Valley × Anthropic, 2026-04-21 – 2026-04-26).
@@ -26,7 +28,9 @@ You should see:
 3. A **Human Approval Gate** pause at the terminal asking you to approve/reject.
 4. On approval, the patch is applied and `npx clawbus logs` shows the full causal timeline of messages.
 
-Everything runs locally on SQLite. Nothing leaks to Discord or the cloud unless you opt in with the `DiscordAdapter` plugin. See [`docs/judging-guide.md`](docs/judging-guide.md) for a 5-minute review checklist.
+Everything runs locally on SQLite. No network calls except to the Anthropic API. See [`docs/judging-guide.md`](docs/judging-guide.md) for a 5-minute review checklist.
+
+**No API key handy?** Read [`docs/protocol.md`](docs/protocol.md) for the message schema and [`docs/judging-guide.md`](docs/judging-guide.md) for a static walk-through. The whole protocol fits in two pages.
 
 ---
 
@@ -36,9 +40,32 @@ Individual Claude Code agents are stateful and great at deep work, but coordinat
 
 1. **A message protocol** (`task`, `result`, `approval-request`, `approval-decision`, `log`) — small enough to memorize, expressive enough for planner / worker / reviewer patterns.
 2. **An append-only message store** — every agent utterance is persisted with a causal parent link, so any run is auditable after the fact.
-3. **Swappable adapters** — the same protocol rides on local files, SQLite, Discord, or (in future) Slack / Redis / NATS. Core code doesn't know or care.
+3. **Swappable adapters** — the same protocol rides on local files or SQLite today, with the adapter interface ready for distributed transports (Discord / Slack / NATS) when you need them. Core code doesn't know or care.
 
-This repo ships the Core + FileAdapter + SQLiteAdapter + a working Planner / Worker / Human-Approval loop using the [Claude Agent SDK](https://docs.claude.com/en/agent-sdk/overview). The DiscordAdapter is provided as an **optional plugin** so you can run ClawBus across machines if you want — but the hackathon demo is entirely local so reviewers can reproduce it in a single shell.
+This repo ships the Core + FileAdapter + SQLiteAdapter + a working Planner / Worker / Human-Approval loop using the [Claude Agent SDK](https://docs.claude.com/en/agent-sdk/overview). Two adapters are battle-tested and exercised by the test suite; distributed transports are listed in the Roadmap. The hackathon demo is entirely local so reviewers can reproduce it in a single shell.
+
+---
+
+## What ClawBus is *not*
+
+- **Not a scheduler.** Agents pull or push messages on their own clock. There is no built-in cron.
+- **Not a workflow engine.** No DAGs, no retries, no compensation logic in Core. Your agents own those decisions.
+- **Not a new agent runtime.** Agents stay as Claude Code / Claude Agent SDK sessions; ClawBus only carries messages between them.
+- **Just a protocol + log + adapters.** The interesting work happens in your agents.
+
+---
+
+## The five message kinds
+
+| Kind | Purpose | Why it's a separate kind |
+|---|---|---|
+| `task` | Delegate a goal to another agent | The unit of work hand-off |
+| `result` | Report success or completion of a task | Closes a `task` without overloading other kinds |
+| `approval-request` | Pause a mutation with inspectable intent | The gate doesn't pause on vibes — it pauses on a fully inspectable message |
+| `approval-decision` | Record human sign-off as a first-class event | The audit log shows *who* approved *what* and *when* |
+| `log` | Operational breadcrumbs (non-terminal) | Preserves observability without polluting `result` semantics |
+
+That's the entire surface. Five kinds, append-only, with a causal `parent` link on every message. See [`docs/protocol.md`](docs/protocol.md) for the schema.
 
 ---
 
@@ -69,7 +96,7 @@ flowchart TB
 
     AIF --> FA[FileAdapter<br/>default · zero-dep]
     AIF --> SA[SQLiteAdapter<br/>default · node:sqlite]
-    AIF -.optional.-> DA[DiscordAdapter<br/>plugin]
+    AIF -.planned.-> DA[DiscordAdapter<br/>roadmap]
 ```
 
 See [`docs/protocol.md`](docs/protocol.md) for the message schema and [`docs/quickstart.md`](docs/quickstart.md) for how to wire your own agents.
@@ -125,7 +152,7 @@ Compared to building a bespoke coordination layer per project, ClawBus gives you
 - **A protocol, not a framework.** Five message kinds. The rest is up to your agents.
 - **Observability by default.** Every agent message is append-only and queryable.
 - **Human-in-the-loop as a first-class kind** (`approval-request` / `approval-decision`), not bolted on.
-- **Adapter pluralism.** Local for dev, Discord for distributed teams, bring-your-own for whatever comes next.
+- **Adapter pluralism.** Two working adapters today (`FileAdapter` for zero-dep, `SQLiteAdapter` for queryability). The adapter interface is the seam for distributed transports — bring your own when you need them.
 
 ---
 
@@ -143,7 +170,7 @@ This repository was created from scratch during the hackathon window (initial co
 
 ## Roadmap (post-hackathon)
 
-- SlackAdapter + NATSAdapter
+- **Distributed adapters**: DiscordAdapter, SlackAdapter, NATSAdapter (the adapter interface is already in place)
 - Persistent scheduler (cron-style agent triggers)
 - Web dashboard for the message timeline
 - Integration recipe with n8n / GitHub Actions / local dev loops
