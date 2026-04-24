@@ -213,6 +213,7 @@ This repository was created from scratch during the hackathon window (initial co
 
 ## Roadmap (post-hackathon)
 
+- **Claude Managed Agents adapter**: delegate worker execution to [Managed Agents](https://platform.claude.com/docs/en/managed-agents/overview) while ClawBus keeps coordination and audit — the "brain detached from hands" pattern, now at the bus level.
 - **More distributed adapters**: SlackAdapter, NATSAdapter, RedisAdapter (DiscordAdapter is already shipped — see [`docs/scenarios/discord-handshake.md`](docs/scenarios/discord-handshake.md))
 - Persistent scheduler (cron-style agent triggers)
 - Web dashboard for the message timeline
