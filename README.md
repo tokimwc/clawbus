@@ -174,6 +174,8 @@ See [`docs/scenarios/discord-handshake.md`](docs/scenarios/discord-handshake.md)
 
 ## What's novel
 
+Unlike agent frameworks that define orchestration runtimes (LangGraph, CrewAI, AutoGen), ClawBus is a minimal coordination protocol: five message kinds, a four-method adapter contract, and auditability that survives transport changes.
+
 Compared to building a bespoke coordination layer per project, ClawBus gives you:
 
 - **A protocol, not a framework.** Five message kinds. The rest is up to your agents.
