@@ -13,6 +13,8 @@ import {
   type DiscordAdapterOptions,
   type ClawBusMessage,
   type FreeTextInput,
+  type FreeTextDecisionInput,
+  prepareFreeTextMessage,
 } from "../src/index.js";
 
 const baseOpts: DiscordAdapterOptions = {
@@ -91,5 +93,88 @@ describe("DiscordAdapter free-text channel — construction validation", () => {
           freeTextToMessage: validTranslator,
         }),
     ).not.toThrow();
+  });
+});
+
+const baseInput: FreeTextDecisionInput = {
+  content: "summarize my kanban backlog",
+  authorId: "222222222222222222",
+  authorName: "toki",
+  authorIsBot: false,
+  messageId: "999999999999999999",
+  timestamp: new Date("2026-04-26T07:00:00.000Z"),
+};
+
+const allowed = ["222222222222222222"] as const;
+
+describe("prepareFreeTextMessage — runtime decision logic", () => {
+  it("ignores bot authors with reason 'bot'", () => {
+    const decision = prepareFreeTextMessage(
+      { ...baseInput, authorIsBot: true },
+      allowed,
+      validTranslator,
+    );
+    expect(decision).toEqual({ action: "ignore", reason: "bot" });
+  });
+
+  it("ignores authors not in the allowlist with reason 'not-allowed'", () => {
+    const decision = prepareFreeTextMessage(
+      { ...baseInput, authorId: "888888888888888888" },
+      allowed,
+      validTranslator,
+    );
+    expect(decision).toEqual({ action: "ignore", reason: "not-allowed" });
+  });
+
+  it("ignores when the translator throws, capturing the error", () => {
+    const boom = new Error("translator boom");
+    const decision = prepareFreeTextMessage(
+      baseInput,
+      allowed,
+      () => {
+        throw boom;
+      },
+    );
+    expect(decision).toMatchObject({
+      action: "ignore",
+      reason: "translator-threw",
+      error: boom,
+    });
+  });
+
+  it("ignores when the translator returns null with reason 'translator-null'", () => {
+    const decision = prepareFreeTextMessage(
+      baseInput,
+      allowed,
+      () => null,
+    );
+    expect(decision).toEqual({ action: "ignore", reason: "translator-null" });
+  });
+
+  it("ignores when the translator returns a malformed ClawBusMessage", () => {
+    const decision = prepareFreeTextMessage(
+      baseInput,
+      allowed,
+      // @ts-expect-error deliberately invalid for this test
+      () => ({ id: "x", from: "user", to: "worker" }), // missing kind, payload, createdAt
+    );
+    expect(decision.action).toBe("ignore");
+    if (decision.action === "ignore") {
+      expect(decision.reason).toBe("invalid-schema");
+    }
+  });
+
+  it("returns 'append' with the validated ClawBusMessage on the happy path", () => {
+    const decision = prepareFreeTextMessage(
+      baseInput,
+      allowed,
+      validTranslator,
+    );
+    expect(decision.action).toBe("append");
+    if (decision.action === "append") {
+      expect(decision.message.kind).toBe("task");
+      expect(decision.message.from).toBe("user");
+      expect(decision.message.to).toBe("worker");
+    }
   });
 });

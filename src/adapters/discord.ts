@@ -278,38 +278,34 @@ export class DiscordAdapter implements Adapter {
 
   /** Inbound free-text message → translate → append to bus. */
   private async handleFreeTextMessage(m: Message): Promise<void> {
-    if (m.author.bot) return;
-    if (m.author.id === this.client.user?.id) return;
-    const allowed = this.opts.freeTextAllowedUserIds ?? [];
-    if (!allowed.includes(m.author.id)) return;
-    const translator = this.opts.freeTextToMessage;
-    if (typeof translator !== "function") return;
-    let translated: ClawBusMessage | null;
-    try {
-      translated = translator({
+    if (m.author.id === this.client.user?.id) return; // ignore self-posts
+    const decision = prepareFreeTextMessage(
+      {
         content: m.content,
         authorId: m.author.id,
         authorName: m.author.username,
+        authorIsBot: m.author.bot,
         messageId: m.id,
         timestamp: m.createdAt,
-      });
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error("[clawbus:DiscordAdapter] freeTextToMessage threw:", err);
+      },
+      this.opts.freeTextAllowedUserIds ?? [],
+      // Existence guaranteed by constructor validation when freeTextChannelId is set.
+      this.opts.freeTextToMessage as (input: FreeTextInput) => ClawBusMessage | null,
+    );
+    if (decision.action === "ignore") {
+      if (
+        decision.reason === "translator-threw" ||
+        decision.reason === "invalid-schema"
+      ) {
+        // eslint-disable-next-line no-console
+        console.error(
+          `[clawbus:DiscordAdapter] free-text ignored (${decision.reason}):`,
+          decision.error,
+        );
+      }
       return;
     }
-    if (translated === null || translated === undefined) return;
-    try {
-      ClawBusMessageSchema.parse(translated);
-    } catch (err) {
-      // eslint-disable-next-line no-console
-      console.error(
-        "[clawbus:DiscordAdapter] freeTextToMessage returned an invalid ClawBusMessage:",
-        err,
-      );
-      return;
-    }
-    await this.append(translated);
+    await this.append(decision.message);
   }
 
   /** Inbound Discord message → parse → cache → deliver. */
@@ -400,3 +396,63 @@ export function decodeMessage(content: string): ClawBusMessage | null {
     return null;
   }
 }
+
+/**
+ * Pure helper: decide what to do with a free-text Discord message.
+ *
+ * Inputs are plain values (no Discord client dependency) so this is fully
+ * unit-testable. Returns a discriminated union: either "ignore" (with a
+ * reason for debugging) or "append" (with the validated ClawBusMessage to
+ * push onto the bus). All side effects (Discord I/O, append to cache) live
+ * in the calling adapter method.
+ */
+export function prepareFreeTextMessage(
+  input: FreeTextDecisionInput,
+  allowedUserIds: readonly string[],
+  translator: (input: FreeTextInput) => ClawBusMessage | null,
+): FreeTextDecision {
+  if (input.authorIsBot) return { action: "ignore", reason: "bot" };
+  if (!allowedUserIds.includes(input.authorId)) {
+    return { action: "ignore", reason: "not-allowed" };
+  }
+  let translated: ClawBusMessage | null;
+  try {
+    translated = translator({
+      content: input.content,
+      authorId: input.authorId,
+      authorName: input.authorName,
+      messageId: input.messageId,
+      timestamp: input.timestamp,
+    });
+  } catch (err) {
+    return { action: "ignore", reason: "translator-threw", error: err };
+  }
+  if (translated === null || translated === undefined) {
+    return { action: "ignore", reason: "translator-null" };
+  }
+  try {
+    ClawBusMessageSchema.parse(translated);
+  } catch (err) {
+    return { action: "ignore", reason: "invalid-schema", error: err };
+  }
+  return { action: "append", message: translated };
+}
+
+/** Plain-value input to `prepareFreeTextMessage` (no Discord types). */
+export interface FreeTextDecisionInput {
+  content: string;
+  authorId: string;
+  authorName: string;
+  authorIsBot: boolean;
+  messageId: string;
+  timestamp: Date;
+}
+
+/** Discriminated decision returned by `prepareFreeTextMessage`. */
+export type FreeTextDecision =
+  | { action: "ignore"; reason: "bot" }
+  | { action: "ignore"; reason: "not-allowed" }
+  | { action: "ignore"; reason: "translator-threw"; error: unknown }
+  | { action: "ignore"; reason: "translator-null" }
+  | { action: "ignore"; reason: "invalid-schema"; error: unknown }
+  | { action: "append"; message: ClawBusMessage };

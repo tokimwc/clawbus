@@ -8,6 +8,9 @@ export {
   DiscordAdapter,
   type DiscordAdapterOptions,
   type FreeTextInput,
+  type FreeTextDecisionInput,
+  type FreeTextDecision,
+  prepareFreeTextMessage,
   encodeMessage as encodeDiscordMessage,
   decodeMessage as decodeDiscordMessage,
 } from "./adapters/discord.js";
