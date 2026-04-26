@@ -7,6 +7,7 @@ export {
 export {
   DiscordAdapter,
   type DiscordAdapterOptions,
+  type FreeTextInput,
   encodeMessage as encodeDiscordMessage,
   decodeMessage as decodeDiscordMessage,
 } from "./adapters/discord.js";
