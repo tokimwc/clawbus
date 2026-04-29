@@ -49,6 +49,40 @@ export interface DiscordAdapterOptions {
   /** Approval reactions (defaults: ✅ ❌). */
   approveEmoji?: string;
   rejectEmoji?: string;
+  /**
+   * Optional: separate Discord channel ID to watch for free-text user input.
+   * Distinct from `channelId` (bus traffic). When set, messages posted here
+   * by allow-listed users are translated via `freeTextToMessage` and
+   * appended to the bus.
+   * Default: undefined (feature disabled, no behavior change).
+   * See docs/design/free-text-channel.md.
+   */
+  freeTextChannelId?: string;
+  /**
+   * Discord user IDs allowed to send free-text. Empty = nobody.
+   * Required (non-empty) when `freeTextChannelId` is set.
+   */
+  freeTextAllowedUserIds?: string[];
+  /**
+   * User-supplied translator: free-text content → ClawBusMessage.
+   * Returning `null` means "ignore this message".
+   * Required when `freeTextChannelId` is set.
+   */
+  freeTextToMessage?: (input: FreeTextInput) => ClawBusMessage | null;
+}
+
+/** Input passed to the free-text translator callback. */
+export interface FreeTextInput {
+  /** Raw Discord message body, untrimmed. */
+  content: string;
+  /** Discord user ID of the sender. */
+  authorId: string;
+  /** Discord username (display name, not handle). */
+  authorName: string;
+  /** Discord message ID, useful for audit/dedup. */
+  messageId: string;
+  /** Message creation timestamp from Discord. */
+  timestamp: Date;
 }
 
 /** Discord-message header pattern, used for parsing inbound messages. */
@@ -84,6 +118,24 @@ export class DiscordAdapter implements Adapter {
       rejectEmoji: opts.rejectEmoji ?? REJECT_DEFAULT,
       reviewerIds: opts.reviewerIds ?? [],
     };
+    // Validate free-text feature configuration (fail-fast at construction).
+    if (opts.freeTextChannelId !== undefined) {
+      if (opts.freeTextChannelId === opts.channelId) {
+        throw new Error(
+          "DiscordAdapter: freeTextChannelId must differ from channelId (mixing free-text and bus protocol on one channel breaks parsing)",
+        );
+      }
+      if (!opts.freeTextAllowedUserIds || opts.freeTextAllowedUserIds.length === 0) {
+        throw new Error(
+          "DiscordAdapter: freeTextAllowedUserIds must be a non-empty array when freeTextChannelId is set (empty allowlist would silently allow zero senders)",
+        );
+      }
+      if (typeof opts.freeTextToMessage !== "function") {
+        throw new Error(
+          "DiscordAdapter: freeTextToMessage callback is required when freeTextChannelId is set",
+        );
+      }
+    }
     const cachePath = opts.cachePath ?? ".clawbus/discord-cache.sqlite";
     if (cachePath !== ":memory:") {
       mkdirSync(path.dirname(path.resolve(cachePath)), { recursive: true });
@@ -101,7 +153,7 @@ export class DiscordAdapter implements Adapter {
     });
 
     this.client.on("messageCreate", (m) => {
-      void this.handleIncomingMessage(m);
+      void this.routeIncomingMessage(m);
     });
     this.client.on("messageReactionAdd", (reaction, user) => {
       void this.handleReaction(reaction, user);
@@ -208,6 +260,54 @@ export class DiscordAdapter implements Adapter {
     }
   }
 
+  /**
+   * Route inbound Discord messages: free-text channel goes through the
+   * translator callback; everything else falls through to the bus parser.
+   * See docs/design/free-text-channel.md.
+   */
+  private async routeIncomingMessage(m: Message): Promise<void> {
+    if (
+      this.opts.freeTextChannelId !== undefined &&
+      m.channelId === this.opts.freeTextChannelId
+    ) {
+      await this.handleFreeTextMessage(m);
+      return;
+    }
+    await this.handleIncomingMessage(m);
+  }
+
+  /** Inbound free-text message → translate → append to bus. */
+  private async handleFreeTextMessage(m: Message): Promise<void> {
+    if (m.author.id === this.client.user?.id) return; // ignore self-posts
+    const decision = prepareFreeTextMessage(
+      {
+        content: m.content,
+        authorId: m.author.id,
+        authorName: m.author.username,
+        authorIsBot: m.author.bot,
+        messageId: m.id,
+        timestamp: m.createdAt,
+      },
+      this.opts.freeTextAllowedUserIds ?? [],
+      // Existence guaranteed by constructor validation when freeTextChannelId is set.
+      this.opts.freeTextToMessage as (input: FreeTextInput) => ClawBusMessage | null,
+    );
+    if (decision.action === "ignore") {
+      if (
+        decision.reason === "translator-threw" ||
+        decision.reason === "invalid-schema"
+      ) {
+        // eslint-disable-next-line no-console
+        console.error(
+          `[clawbus:DiscordAdapter] free-text ignored (${decision.reason}):`,
+          decision.error,
+        );
+      }
+      return;
+    }
+    await this.append(decision.message);
+  }
+
   /** Inbound Discord message → parse → cache → deliver. */
   private async handleIncomingMessage(m: Message): Promise<void> {
     if (m.channelId !== this.opts.channelId) return;
@@ -296,3 +396,63 @@ export function decodeMessage(content: string): ClawBusMessage | null {
     return null;
   }
 }
+
+/**
+ * Pure helper: decide what to do with a free-text Discord message.
+ *
+ * Inputs are plain values (no Discord client dependency) so this is fully
+ * unit-testable. Returns a discriminated union: either "ignore" (with a
+ * reason for debugging) or "append" (with the validated ClawBusMessage to
+ * push onto the bus). All side effects (Discord I/O, append to cache) live
+ * in the calling adapter method.
+ */
+export function prepareFreeTextMessage(
+  input: FreeTextDecisionInput,
+  allowedUserIds: readonly string[],
+  translator: (input: FreeTextInput) => ClawBusMessage | null,
+): FreeTextDecision {
+  if (input.authorIsBot) return { action: "ignore", reason: "bot" };
+  if (!allowedUserIds.includes(input.authorId)) {
+    return { action: "ignore", reason: "not-allowed" };
+  }
+  let translated: ClawBusMessage | null;
+  try {
+    translated = translator({
+      content: input.content,
+      authorId: input.authorId,
+      authorName: input.authorName,
+      messageId: input.messageId,
+      timestamp: input.timestamp,
+    });
+  } catch (err) {
+    return { action: "ignore", reason: "translator-threw", error: err };
+  }
+  if (translated === null || translated === undefined) {
+    return { action: "ignore", reason: "translator-null" };
+  }
+  try {
+    ClawBusMessageSchema.parse(translated);
+  } catch (err) {
+    return { action: "ignore", reason: "invalid-schema", error: err };
+  }
+  return { action: "append", message: translated };
+}
+
+/** Plain-value input to `prepareFreeTextMessage` (no Discord types). */
+export interface FreeTextDecisionInput {
+  content: string;
+  authorId: string;
+  authorName: string;
+  authorIsBot: boolean;
+  messageId: string;
+  timestamp: Date;
+}
+
+/** Discriminated decision returned by `prepareFreeTextMessage`. */
+export type FreeTextDecision =
+  | { action: "ignore"; reason: "bot" }
+  | { action: "ignore"; reason: "not-allowed" }
+  | { action: "ignore"; reason: "translator-threw"; error: unknown }
+  | { action: "ignore"; reason: "translator-null" }
+  | { action: "ignore"; reason: "invalid-schema"; error: unknown }
+  | { action: "append"; message: ClawBusMessage };
