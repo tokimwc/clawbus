@@ -10,15 +10,3 @@
 //     slugify("  Foo--Bar !!  ")       -> "foo-bar"
 //     slugify("Привет")                 -> "" (no ASCII alphanumeric)
 //     slugify("v4.7-beta+build")       -> "v4-7-beta-build"
-
-/**
- * Converts a string into a URL-friendly slug.
- * @param {string} input
- * @returns {string}
- */
-export function slugify(input) {
-  return input
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
