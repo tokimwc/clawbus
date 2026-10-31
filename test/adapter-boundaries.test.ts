@@ -141,23 +141,6 @@ for (const { name, file, make } of persistent) {
   });
 }
 
-describe("SQLiteAdapter duplicate id", () => {
-  it("rejects a duplicate id, keeps the original untouched and does not deliver", async () => {
-    const a = new SQLiteAdapter({ path: tmpPath("dup.sqlite") });
-    let delivered = 0;
-    a.subscribe("worker", () => void delivered++);
-    await a.append(msg("01A", { payload: { goal: "original" } }));
-    await expect(a.append(msg("01A", { payload: { goal: "overwrite" } }))).rejects.toThrow(
-      /UNIQUE|constraint/i,
-    );
-    const all = await a.query({});
-    expect(all).toHaveLength(1);
-    expect(all[0]!.payload).toEqual({ goal: "original" });
-    expect(delivered).toBe(1);
-    await a.close();
-  });
-});
-
 const both: Array<{ name: string; make: () => Adapter }> = [
   { name: "FileAdapter", make: () => new FileAdapter({ path: tmpPath("o.jsonl") }) },
   { name: "SQLiteAdapter", make: () => new SQLiteAdapter({ path: ":memory:" }) },
@@ -165,24 +148,7 @@ const both: Array<{ name: string; make: () => Adapter }> = [
 
 for (const { name, make } of both) {
   describe(`${name} ordering & subscription edge cases`, () => {
-    it("messages with an identical createdAt keep send order (ULID tiebreak)", async () => {
-      const fixed = new Date(T0);
-      const bus = new ClawBus({ adapter: make(), now: () => fixed });
-      const sent: string[] = [];
-      for (let i = 0; i < 30; i++) {
-        const m = await bus.send({
-          from: "planner",
-          to: "worker",
-          kind: "task",
-          payload: { goal: String(i) },
-        });
-        sent.push(m.id);
-      }
-      expect((await bus.query({})).map((m) => m.id)).toEqual(sent);
-      await bus.close();
-    });
-
-    it("concurrent sends at the same timestamp are queried in id order and none are lost", async () => {
+    it("concurrent sends at the same timestamp are all stored and returned exactly once", async () => {
       const fixed = new Date(T0);
       const bus = new ClawBus({ adapter: make(), now: () => fixed });
       const sent = await Promise.all(
@@ -196,9 +162,9 @@ for (const { name, make } of both) {
         ),
       );
       const got = (await bus.query({ to: "worker" })).map((m) => m.id);
+      // Order among equal createdAt is not part of the protocol; only presence is.
       expect(got).toHaveLength(50);
-      expect(got).toEqual(sent.map((m) => m.id));
-      expect(got).toEqual([...got].sort());
+      expect([...got].sort()).toEqual(sent.map((m) => m.id).sort());
       await bus.close();
     });
 
@@ -258,15 +224,6 @@ for (const { name, make } of both) {
       await a.close();
     });
 
-    it("a direct message to an agent that is also subscribed to broadcast is delivered to both", async () => {
-      const a = make();
-      const calls: string[] = [];
-      a.subscribe("worker", () => void calls.push("worker"));
-      a.subscribe("broadcast", () => void calls.push("broadcast-sub"));
-      await a.append(msg("01A"));
-      expect(calls.sort()).toEqual(["broadcast-sub", "worker"]);
-      await a.close();
-    });
   });
 }
 
@@ -287,8 +244,45 @@ describe("FileAdapter append concurrency", () => {
   });
 });
 
+// Behaviour of the current implementation that the protocol text does not
+// promise. Kept as passing observations (so a change is noticed), not as contract.
+for (const { name, make } of both) {
+  describe(`${name} implementation observations, non-normative`, () => {
+    it("equal-createdAt messages currently come back in send (monotonic ULID) order", async () => {
+      const fixed = new Date(T0);
+      const bus = new ClawBus({ adapter: make(), now: () => fixed });
+      const sent: string[] = [];
+      for (let i = 0; i < 30; i++) {
+        const m = await bus.send({
+          from: "planner",
+          to: "worker",
+          kind: "task",
+          payload: { goal: String(i) },
+        });
+        sent.push(m.id);
+      }
+      expect((await bus.query({})).map((m) => m.id)).toEqual(sent);
+      await bus.close();
+    });
+
+    it("concurrent equal-createdAt sends currently come back in id order", async () => {
+      const fixed = new Date(T0);
+      const bus = new ClawBus({ adapter: make(), now: () => fixed });
+      const sent = await Promise.all(
+        Array.from({ length: 50 }, () =>
+          bus.send({ from: "planner", to: "worker", kind: "task", payload: {} }),
+        ),
+      );
+      const got = (await bus.query({ to: "worker" })).map((m) => m.id);
+      expect(got).toEqual(sent.map((m) => m.id));
+    });
+  });
+}
+
 describe("unconfirmed behaviours (spec is silent — not asserted)", () => {
-  it.todo("duplicate message id: FileAdapter appends a second line, SQLiteAdapter rejects (UNIQUE) — protocol.md does not say which is right");
+  it.todo("duplicate message id: FileAdapter appends a second line, SQLiteAdapter rejects with a UNIQUE-constraint error — protocol.md does not say which is right, nor the error text");
+  it.todo("an adapter subscribed under the agent id \"broadcast\" also receives direct messages to other agents (both adapters) — §3/§5 do not define subscribing as \"broadcast\"");
+  it.todo("order of equal-createdAt messages from query() is not part of the protocol (§5 only promises createdAt ascending); see the non-normative observations above");
   it.todo("SQLiteAdapter.close() twice throws 'database is not open' while FileAdapter.close() twice is a no-op — idempotent close is unspecified");
   it.todo("waitFor({ timeoutMs: 0 }) is currently treated as 'no timeout' — protocol.md does not define 0");
   it.todo("FileAdapter.query on a file with a truncated/corrupt JSONL line throws SyntaxError — recovery policy is unspecified");

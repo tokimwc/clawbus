@@ -16,8 +16,6 @@ import {
   type MessageKind,
 } from "./types.js";
 
-const WAITFOR_POLL_INTERVAL_MS = 25;
-
 export interface SendInput {
   from?: AgentId;
   to: AgentIdOrBroadcast;
@@ -101,11 +99,9 @@ export class ClawBus {
       let settled = false;
       let unsubscribe: Unsubscribe | null = null;
       let timer: ReturnType<typeof setTimeout> | null = null;
-      let poller: ReturnType<typeof setInterval> | null = null;
 
       const cleanup = () => {
         if (timer) clearTimeout(timer);
-        if (poller) clearInterval(poller);
         if (unsubscribe) unsubscribe();
       };
 
@@ -124,35 +120,6 @@ export class ClawBus {
         cleanup();
         resolve(msg);
       });
-
-      // The adapter interface only supports per-agent subscriptions, so a
-      // filter without `to` cannot be observed through `subscribe` (it would
-      // only ever see broadcasts). docs/protocol.md §6 makes `to` optional, so
-      // additionally poll `query` to catch future messages to any recipient.
-      if (filter.to === undefined) {
-        let polling = false;
-        poller = setInterval(() => {
-          if (settled || polling) return;
-          polling = true;
-          this.adapter
-            .query(filter)
-            .then((hits) => {
-              if (settled || hits.length === 0) return;
-              settled = true;
-              cleanup();
-              resolve(hits[0]!);
-            })
-            .catch((err: unknown) => {
-              if (settled) return;
-              settled = true;
-              cleanup();
-              reject(err);
-            })
-            .finally(() => {
-              polling = false;
-            });
-        }, WAITFOR_POLL_INTERVAL_MS);
-      }
 
       if (timeoutMs !== undefined && timeoutMs > 0) {
         timer = setTimeout(() => {

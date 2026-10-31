@@ -27,10 +27,11 @@ npm run build       # tsc -> dist/
 npm test            # vitest run
 ```
 
-The test suite uses only temporary files and in-memory SQLite (the Discord tests
-cover just the message encode/decode functions): it never calls the Anthropic
-API, Discord, or any other external service, and it needs no
-`ANTHROPIC_API_KEY`. It exercises the Core (`send` / `subscribe` / `query` /
+The test suite writes JSONL / SQLite files only into temporary directories
+under the OS temp dir (some older tests do not delete theirs) and otherwise uses
+in-memory SQLite (`:memory:`); the Discord tests cover just the message
+encode/decode functions. It never calls the Anthropic API, Discord, or any other
+external service, and it needs no `ANTHROPIC_API_KEY`. It exercises the Core (`send` / `subscribe` / `query` /
 `waitFor`), the File / SQLite adapter contracts and the Discord message
 encoding. Node prints an `ExperimentalWarning` for `node:sqlite`, and a
 couple of tests intentionally log a "handler threw" message to stderr — both are
