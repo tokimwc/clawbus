@@ -268,13 +268,17 @@ for (const { name, make } of both) {
     it("concurrent equal-createdAt sends currently come back in id order", async () => {
       const fixed = new Date(T0);
       const bus = new ClawBus({ adapter: make(), now: () => fixed });
-      const sent = await Promise.all(
-        Array.from({ length: 50 }, () =>
-          bus.send({ from: "planner", to: "worker", kind: "task", payload: {} }),
-        ),
-      );
-      const got = (await bus.query({ to: "worker" })).map((m) => m.id);
-      expect(got).toEqual(sent.map((m) => m.id));
+      try {
+        const sent = await Promise.all(
+          Array.from({ length: 50 }, () =>
+            bus.send({ from: "planner", to: "worker", kind: "task", payload: {} }),
+          ),
+        );
+        const got = (await bus.query({ to: "worker" })).map((m) => m.id);
+        expect(got).toEqual(sent.map((m) => m.id));
+      } finally {
+        await bus.close();
+      }
     });
   });
 }

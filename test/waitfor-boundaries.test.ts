@@ -268,23 +268,26 @@ for (const { name, make } of factories) {
     it.fails("KNOWN FAILURE: waitFor without `to` should resolve for a future direct message", async () => {
       const spy = new SpyAdapter(make());
       const bus = new ClawBus({ adapter: spy });
-      const task = await bus.send({
-        from: "planner",
-        to: "worker",
-        kind: "task",
-        payload: { goal: "x" },
-      });
-      const p = bus.waitFor({ parent: task.id, kind: "result", timeoutMs: 300 });
-      await until(() => spy.live === 1, "waitFor subscription");
-      const res = await bus.send({
-        from: "worker",
-        to: "planner",
-        kind: "result",
-        parent: task.id,
-        payload: { status: "ok", summary: "done" },
-      });
-      await expect(p).resolves.toMatchObject({ id: res.id });
-      await bus.close();
+      try {
+        const task = await bus.send({
+          from: "planner",
+          to: "worker",
+          kind: "task",
+          payload: { goal: "x" },
+        });
+        const p = bus.waitFor({ parent: task.id, kind: "result", timeoutMs: 300 });
+        await until(() => spy.live === 1, "waitFor subscription");
+        const res = await bus.send({
+          from: "worker",
+          to: "planner",
+          kind: "result",
+          parent: task.id,
+          payload: { status: "ok", summary: "done" },
+        });
+        await expect(p).resolves.toMatchObject({ id: res.id });
+      } finally {
+        await bus.close();
+      }
     });
   });
 

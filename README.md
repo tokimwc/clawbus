@@ -38,6 +38,32 @@ couple of tests intentionally log a "handler threw" message to stderr — both a
 expected. It does **not** cover the Planner / Worker agents, the CLI, or a real
 Discord connection.
 
+#### Reading the test results and known limitations
+
+At reviewed commit `0885be8`, Vitest reported 80 passed and 12 todo. This is
+**not 80 confirmed product contracts**: the result comprises 72 contract tests,
+6 non-normative observations of current behavior, and 2 expected-failure tests
+(`it.fails`, one per File / SQLite adapter). The 12 `todo` entries are not
+executed checks. These counts describe the reviewed run, not a new verification
+of later edits.
+
+The expected-failure tests record an unresolved limitation: `waitFor` without
+`to` does not observe a future direct message to an arbitrary agent. This is not
+fixed by the test additions. The protocol's intended scope of this behavior
+still needs clarification; see the known-failure and `todo` comments in
+`test/waitfor-boundaries.test.ts`. Do not treat a green suite as proof that this
+case works. An `it.fails` test is expected to fail and becomes a failing suite
+entry if its body unexpectedly succeeds; unrelated failures can also satisfy
+that marker, so inspect the failure cause when validating a fix.
+
+The observation tests are not promises of protocol behavior, even though their
+assertions can make CI fail after an implementation change. Review the protocol
+before turning an observation or `todo` into a contract. The previous polling
+workaround was reverted because it kept the process alive and repeatedly
+scanned the store; the reviewed `src/` tree matches the original main baseline.
+Real Discord / API integration, Windows, and other Node versions remain outside
+the offline verification above.
+
 ### B. Run the real-API demo (needs `ANTHROPIC_API_KEY`, incurs API charges)
 
 This part calls the Anthropic API through the Claude Agent SDK. Run it only if
