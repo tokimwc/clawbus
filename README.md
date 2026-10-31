@@ -10,12 +10,41 @@ This repository is the submission for **Built with Opus 4.7: a Claude Code Hacka
 
 ---
 
-## TL;DR for hackathon reviewers
+## Quick start
+
+### A. Verify offline (no API key, no network after install)
+
+Requires Node ≥ 22.5 (uses the built-in `node:sqlite`) and npm. The steps below were
+reproduced on Node 22.23.4 / npm 10.9.9 on Linux; other Node versions and OSes are
+not verified here.
 
 ```bash
 git clone https://github.com/tokimwc/clawbus.git
 cd clawbus
-npm install
+npm ci              # installs from package-lock.json (needs the npm registry once)
+npm run typecheck   # tsc --noEmit
+npm run build       # tsc -> dist/
+npm test            # vitest run
+```
+
+The test suite uses only temporary files and in-memory SQLite (the Discord tests
+cover just the message encode/decode functions): it never calls the Anthropic
+API, Discord, or any other external service, and it needs no
+`ANTHROPIC_API_KEY`. It exercises the Core (`send` / `subscribe` / `query` /
+`waitFor`), the File / SQLite adapter contracts and the Discord message
+encoding. Node prints an `ExperimentalWarning` for `node:sqlite`, and a
+couple of tests intentionally log a "handler threw" message to stderr — both are
+expected. It does **not** cover the Planner / Worker agents, the CLI, or a real
+Discord connection.
+
+### B. Run the real-API demo (needs `ANTHROPIC_API_KEY`, incurs API charges)
+
+This part calls the Anthropic API through the Claude Agent SDK. Run it only if
+you accept the cost; it has not been re-run as part of the offline verification
+above, so the expected output below comes from the author's captured runs.
+
+```bash
+npm ci
 npm run build
 export ANTHROPIC_API_KEY=sk-ant-...
 npx clawbus demo
@@ -28,7 +57,10 @@ You should see:
 3. A **Human Approval Gate** pause at the terminal asking you to approve/reject.
 4. On approval, the patch is applied and `npx clawbus logs` shows the full causal timeline of messages.
 
-Everything runs locally on SQLite. No network calls except to the Anthropic API. See [`docs/judging-guide.md`](docs/judging-guide.md) for a 5-minute review checklist with branches for "no API key" vs "with API key" reviewers.
+Messages are stored locally in SQLite; the only network traffic is to the
+Anthropic API. See [`docs/judging-guide.md`](docs/judging-guide.md) for a
+5-minute review checklist with branches for "no API key" vs "with API key"
+reviewers.
 
 **No API key handy?** The [judging guide](docs/judging-guide.md) and [`docs/scenarios/`](docs/scenarios/) contain three captured end-to-end runs with full message timelines and costs. The whole protocol fits in two pages — see [`docs/protocol.md`](docs/protocol.md).
 
