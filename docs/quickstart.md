@@ -133,5 +133,7 @@ interface Adapter {
 
 See [`src/adapters/file.ts`](../src/adapters/file.ts) and
 [`src/adapters/sqlite.ts`](../src/adapters/sqlite.ts) for reference
-implementations. A DiscordAdapter and SlackAdapter are on the roadmap
-after the hackathon.
+implementations. A [`DiscordAdapter`](../src/adapters/discord.ts) is
+already implemented — see the
+[Discord handshake scenario](scenarios/discord-handshake.md) for a full
+walkthrough. A SlackAdapter is on the roadmap after the hackathon.
